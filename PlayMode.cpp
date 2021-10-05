@@ -206,9 +206,9 @@ void PlayMode::update(float elapsed) {
     // reached end of game
     if (current_event >= 11 && enter_pressed) {
         current_event = 0;
-        academics = 100.f;
-        social = 100.f;
-        health = 100.f;
+        academics = 100;
+        social = 100;
+        health = 100;
     } else if (academics <= 0 && enter_pressed) {
         current_event = 12;
     } else if (social <= 0 && enter_pressed) {
@@ -345,7 +345,7 @@ float PlayMode::render_line(std::string text, float &start_x, float &start_y, fl
             ch = it->second;
         }
 
-        biggest_char_size = fmax(biggest_char_size, ch.Size.y);
+        biggest_char_size = (float)fmax(biggest_char_size, ch.Size.y);
 
         float xpos = x + ch.Bearing.x * scale;
         float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
