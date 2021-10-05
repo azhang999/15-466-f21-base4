@@ -54,3 +54,65 @@ Go to Noodlehead
 Stay home
 Your friends want to go get dinner at Noodlehead, but you’re supposed to work on a group project later tonight.
 You should be able to make it back in time…
+
+25
+0.5
+26
+27
+Eat at iNoodle
+1.0
+28
+28
+Don't eat
+You have 15 minutes between classes and you feel very hungry.
+The line for iNoodle looks pretty short.
+
+29
+0.7
+30
+31
+Tell the person to quiet down
+1.0
+32
+32
+Put up with the noise
+You're on Gates 8th working on 112 homework.
+A person takes out their mechanical keyboard and starts typing really loudly.
+After a while it really starts bothering you.
+
+33
+0.5
+34
+35
+Go to the event
+1.0
+36
+36
+Skip the event
+Your RA is hosting an event for your floor.
+They promised you guys food and fun games.
+
+37
+0.6
+38
+39
+Stay in Gates
+1.0
+40
+40
+Go home
+It’s 3am and you’re still in Gates working on the 112 term project.
+You want to have an MVP ready for the checkpoint tomorrow.
+The game you are making is nowhere near MVP yet.
+
+41
+0.5
+42
+43
+Keep getting ready
+1.0
+44
+44
+Go to class
+You’re getting ready in the morning and you check the time
+and notice that you’re going to be late for Calc 1.

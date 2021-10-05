@@ -204,17 +204,17 @@ void PlayMode::update(float elapsed) {
     StateType state_type = id_to_state_type[state_id];
 
     // reached end of game
-    if (current_event >= 11 && enter_pressed) {
+    if (current_event >= 21 && enter_pressed) {
         current_event = 0;
         academics = 100;
         social = 100;
         health = 100;
     } else if (academics <= 0 && enter_pressed) {
-        current_event = 12;
+        current_event = 22;
     } else if (social <= 0 && enter_pressed) {
-        current_event = 13;
+        current_event = 23;
     } else if (health <= 0 && enter_pressed) {
-        current_event = 14;
+        current_event = 24;
     } else if (state_type == DIALOGUE && enter_pressed) {
         current_event++;
     } else if (state_type == CHOICE) {

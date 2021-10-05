@@ -102,3 +102,112 @@ You end up being late for your group project.
 -30
 You tell your friends that you’re too busy to go with them.
 It’s time to eat some more raw chicken from the underground.
+
+26
+-30
++0
+-30
+You find a cockroach in your bowl and the thought of almost eating that
+has you throwing up intermittently for the rest of the day.
+So much for getting work done.
+
+27
++10
++0
++10
+The food was filling and sated your hunger.
+This allows you to pay attention in 112.
+
+28
+-15
+-10
+-15
+Not only can you not focus in class, your stomach makes what sounds like a whale call
+during a very quiet moment in class.
+
+30
++20
+-10
++0
+The person glares at you but puts away their mechanical keyboard.
+You can tell the other people in the area appreciated your actions.
+
+31
++10
+-40
++0
+Turns out the person is a very popular 112 TA.
+The TA's friends sitting at the table laugh at you and tell you to move somewhere else.
+Maybe you shouldn’t have messed with them.
+
+32
+-20
++0
++0
+You put up with the noise for an hour before you decide to go study somewhere else.
+Sadly, it's 4pm and every seat on every floor of Gates is taken.
+Even the spot you left next to the loud typer has now been taken.
+
+34
+-20
++20
++15
+The event ends up being very fun.
+You get closer to the people on your floor.
+The sense of community almost makes up for how small the rooms are.
+
+35
+-20
++5
++20
+No one except you and the RA shows up to the event.
+You feel bad for the RA, you know they’re trying their best.
+At least you get to eat all the free food.
+
+36
++15
+-25
+-10
+You decide to skip the event and use the time to study.
+When you get back to the dorms, you notice that people have gotten closer to each other.
+They’re laughing about something that happened during the event.
+You decide that you better go to the next one.
+
+38
++20
++0
+-30
+You leave Gates at 8:20am with an MVP completed.
+You feel exhausted and you’re ready to crash, but then you realize you have
+Physics I lecture in 10 minutes.
+You’re almost back at the dorm, but you turn around and head back toward campus.
+
+39
+-30
++0
+-30
+It’s morning and you’re still in Gates.
+The MVP is not working.
+You watch the sunrise out of the 9th floor conference room.
+It’s beautiful.
+
+42
+-25
++15
++0
+The professor gave a pop quiz during the first 5 minutes of class.
+They’re never given pop quizzes before, why did it have to be today...
+
+43
+-5
++15
++0
+Thankfully the professor was just talking about exam logistics.
+You got there right when they started teaching new material.
+
+44
++15
+-30
+-10
+You bump into your crush when you walk out of Calc 1 lecture.
+They comment about how you should take a shower once in a while.

@@ -68,7 +68,19 @@ struct PlayMode : Mode {
     uint32_t FAIL_SOCIAL = 2;
     uint32_t FAIL_HEALTH = 3;
 
-    uint32_t story_line [15] = {0, 5, 0, 9, 0, 13, 0, 21, 0, 17, 0, PASS, FAIL_ACADEMICS, FAIL_SOCIAL, FAIL_HEALTH};
+    uint32_t story_line [25] = {
+    0, 
+    5, 0, 
+    33, 0,
+    9, 0, 
+    41, 0,
+    25, 0,
+    37, 0,
+    13, 0, 
+    29, 0,
+    21, 0, 
+    17, 0, 
+    PASS, FAIL_ACADEMICS, FAIL_SOCIAL, FAIL_HEALTH};
     uint32_t current_event = 0;
 
     int32_t academics = 100;
