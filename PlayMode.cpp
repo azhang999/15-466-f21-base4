@@ -148,7 +148,7 @@ PlayMode::PlayMode() {
     }
 
 	// find path to font
-    std::string font_name = data_path("Arial.ttf");
+    std::string font_name = data_path("LiberationSerif-Regular.ttf");
     if (font_name.empty())
     {
         std::cout << "ERROR::FREETYPE: Failed to load font_name" << std::endl;
