@@ -1,0 +1,25 @@
+0
+It’s your first semester at CMU, you’re nervous about how it will go. 
+Will you be stuck in your room every day doing homework?
+Will you party too hard and fail all your classes?
+The possibilities are endless-- choose wisely young freshman.
+
+1
+Looks like you didn’t pay attention to your academics enough.
+You had a lot of fun this semester but you ended up failing 15-112.
+Make sure you study more next semester.
+
+2
+Looks like you didn’t pay enough attention to your social life.
+You passed your classes but you have no friends.
+Better try to meet some people next semester.
+
+3
+Looks like you didn’t pay enough attention to your health.
+You passed your classes and had fun, but you feel miserable.
+Maybe take a nap once in a while next semester.
+
+4
+You got an A in 15-112, made a lot of friends and got a reasonable amount of sleep.
+Congrats on making it through your first semester successfully!
+Get ready for 7 more long semesters…

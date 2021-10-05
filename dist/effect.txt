@@ -1,0 +1,104 @@
+6
+-35
++30
+-30
+You partied all night long, and totally forgot about your 112 assignment until the next morning.
+
+7
++10
++15
+-25
+You had fun at the party, and you ended up meeting a classmate that’s also taking 112.
+You guys end up creating a study group to work on 112.
+
+8
++25
+-45
++0
+You stay home and end up finishing the assignment.
+The next morning you see your friends post a bunch of pictures of the party.
+It looked really fun…
+
+10
+-20
++30
++10
+You had a really fun time on the date, and you guys become official within the week.
+
+11
++0
+-40
++0
+You guys got into an argument on the date.
+This definitely won’t work out.
+It’s going to be awkward when you see them in class.
+
+12
++0
+-25
++0
+They don’t take rejection so well.
+Things are awkward between you guys now.
+
+14
++20
+-20
+-15
+The studying definitely paid off.
+You knew all the answers for the quiz and ended up getting an A.
+
+15
+-15
+-15
+-15
+Even though you studied tirelessly, you did not manage your time well during the quiz and ended up doing poorly.
+
+16
+-40
++0
++0
+You don’t change your studying habits and end up doing poorly on the next quiz.
+
+18
++40
+-10
+-40
+Even in your sleep deprived state, you managed to show up to the exam and braindump.
+Somehow you clutched it and passed the exam.
+
+19
+-80
+-10
+-30
+You wake up at 1pm the next day and you realize you missed the exam.
+The professor does not allow you to take a makeup exam.
+
+20
+-60
+-10
++30
+You show up to the exam well rested, but not knowing much about anything. Somehow you ended up getting a D.
+
+22
++0
++15
++25
+You go to Noodlehead and order the street noodle number 1.
+Off campus food tastes so good.
+You feel refreshed and make it back just in time to work on the group project.
+
+23
+-40
++15
++25
+You go to Noodlehead and order the street noodle number 1.
+Off campus food tastes so good.
+However, the bus doesn’t show up for an hour after your dinner.
+You end up being late for your group project.
+
+24
++20
+-30
+-30
+You tell your friends that you’re too busy to go with them.
+It’s time to eat some more raw chicken from the underground.

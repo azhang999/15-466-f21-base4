@@ -1,236 +1,473 @@
 #include "PlayMode.hpp"
 
-#include "LitColorTextureProgram.hpp"
-
-#include "DrawLines.hpp"
+#include "ColorTextureProgram.hpp"
 #include "Mesh.hpp"
 #include "Load.hpp"
 #include "gl_errors.hpp"
 #include "data_path.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
+#include <hb.h>
+#include <hb-ft.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include <random>
+#include <fstream>
 
-GLuint hexapod_meshes_for_lit_color_texture_program = 0;
-Load< MeshBuffer > hexapod_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer const *ret = new MeshBuffer(data_path("hexapod.pnct"));
-	hexapod_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
-	return ret;
-});
+#define FONT_SIZE 36
+#define MARGIN (FONT_SIZE * .5)
 
-Load< Scene > hexapod_scene(LoadTagDefault, []() -> Scene const * {
-	return new Scene(data_path("hexapod.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
+// SOURCE for Character struct idea: https://learnopengl.com/In-Practice/Text-Rendering
+/// Holds all state information relevant to a character as loaded using FreeType
+struct Character {
+    unsigned int TextureID; // ID handle of the glyph texture
+    glm::ivec2   Size;      // Size of glyph
+    glm::ivec2   Bearing;   // Offset from baseline to left/top of glyph
+    unsigned int Advance;   // Horizontal offset to advance to next glyph
+};
+std::map<hb_codepoint_t, Character> Characters;
+unsigned int VAO, VBO;
 
-		scene.drawables.emplace_back(transform);
-		Scene::Drawable &drawable = scene.drawables.back();
+void PlayMode::read_dialogue() {
+    std::string dialogue_path = data_path("dialogue.txt");
+    std::ifstream file(dialogue_path);
+    std::string id_line;
+    while (std::getline(file, id_line)) {
+        // parse out id
+        uint32_t id = std::stoi(id_line);
+        std::string text;
+        std::string line = ".";
+        while (line != "") {
+            // txt file needs empty line at end
+            std::getline(file, line);
+            text.append(line + "\n");
+        }
+        // build dialogue
+        Dialogue dialogue{id, text};
+        dialogue_map[id] = dialogue;
+        id_to_state_type[id] = DIALOGUE;
+    }
+}
 
-		drawable.pipeline = lit_color_texture_program_pipeline;
+void PlayMode::read_choice_select(std::ifstream &file, ChoiceSelect &choice) {
+    std::string line = "";
+    // get probability
+    std::getline(file, line);
+    choice.prob = std::stof(line);
 
-		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
-		drawable.pipeline.type = mesh.type;
-		drawable.pipeline.start = mesh.start;
-		drawable.pipeline.count = mesh.count;
+    // get effect1 id
+    line = "";
+    std::getline(file, line);
+    choice.effect1_id = std::stoi(line);
 
-	});
-});
+    // get effect2 id
+    line = "";
+    std::getline(file, line);
+    choice.effect2_id = std::stoi(line);
 
-Load< Sound::Sample > dusty_floor_sample(LoadTagDefault, []() -> Sound::Sample const * {
-	return new Sound::Sample(data_path("dusty-floor.opus"));
-});
+    // get text - choice can only be 1 line
+    line = "";
+    std::getline(file, line);
+    choice.text = line;
+}
 
-PlayMode::PlayMode() : scene(*hexapod_scene) {
-	//get pointers to leg for convenience:
-	for (auto &transform : scene.transforms) {
-		if (transform.name == "Hip.FL") hip = &transform;
-		else if (transform.name == "UpperLeg.FL") upper_leg = &transform;
-		else if (transform.name == "LowerLeg.FL") lower_leg = &transform;
-	}
-	if (hip == nullptr) throw std::runtime_error("Hip not found.");
-	if (upper_leg == nullptr) throw std::runtime_error("Upper leg not found.");
-	if (lower_leg == nullptr) throw std::runtime_error("Lower leg not found.");
+void PlayMode::read_choice() {
+    std::string choice_path = data_path("choice.txt");
+    std::ifstream file(choice_path);
+    std::string id_line;
+    while (std::getline(file, id_line)) {
+        // parse out id
+        uint32_t id = std::stoi(id_line);
+        Choice choice;
+        choice.id = id;
+        read_choice_select(file, choice.choice1);
+        read_choice_select(file, choice.choice2);
 
-	hip_base_rotation = hip->rotation;
-	upper_leg_base_rotation = upper_leg->rotation;
-	lower_leg_base_rotation = lower_leg->rotation;
+        std::string text;
+        std::string line = ".";
+        while (line != "") {
+            // txt file needs empty line at end
+            std::getline(file, line);
+            text.append(line + "\n");
+        }
+        // build dialogue
+        choice.text = text;
+        choice_map[id] = choice;
+        id_to_state_type[id] = CHOICE;
+    }
+}
 
-	//get pointer to camera for convenience:
-	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
-	camera = &scene.cameras.front();
+void PlayMode::read_effect() {
+    std::string effect_path = data_path("effect.txt");
+    std::ifstream file(effect_path);
+    std::string id_line;
+    while (std::getline(file, id_line)) {
+        // parse out id
+        uint32_t id = std::stoi(id_line);
+        Effect effect;
+        effect.id = id;
+    
+        std::string stat_line;
+        
+        std::getline(file, stat_line);
+        effect.academics = std::stoi(stat_line);
+        std::getline(file, stat_line);
+        effect.social = std::stoi(stat_line);
+        std::getline(file, stat_line);
+        effect.health = std::stoi(stat_line);
 
-	//start music loop playing:
-	// (note: position will be over-ridden in update())
-	leg_tip_loop = Sound::loop_3D(*dusty_floor_sample, 1.0f, get_leg_tip_position(), 10.0f);
+        std::string text;
+        std::string line = ".";
+        while (line != "") {
+            // txt file needs empty line at end
+            std::getline(file, line);
+            text.append(line + "\n");
+        }
+        // build dialogue
+        effect.text = text;
+        effect_map[id] = effect;
+        id_to_state_type[id] = EFFECT;
+    }
+}
+
+FT_Library ft;
+FT_Face face;
+PlayMode::PlayMode() {
+    // SOURCE for initializing opengl + FT: https://learnopengl.com/In-Practice/Text-Rendering
+    // OpenGL state
+    // ------------
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (FT_Init_FreeType(&ft))
+    {
+        std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
+        abort();
+    }
+
+	// find path to font
+    std::string font_name = data_path("Arial.ttf");
+    if (font_name.empty())
+    {
+        std::cout << "ERROR::FREETYPE: Failed to load font_name" << std::endl;
+        abort();
+    }
+	
+	// load font as face
+    // FT_Face face;
+    if (FT_New_Face(ft, font_name.c_str(), 0, &face)) {
+        std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
+        abort();
+    }
+
+    // configure VAO/VBO for texture quads
+    // -----------------------------------
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    read_dialogue();
+    read_choice();
+    read_effect();
 }
 
 PlayMode::~PlayMode() {
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
-
-	if (evt.type == SDL_KEYDOWN) {
-		if (evt.key.keysym.sym == SDLK_ESCAPE) {
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_a) {
-			left.downs += 1;
-			left.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_d) {
-			right.downs += 1;
-			right.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_w) {
-			up.downs += 1;
-			up.pressed = true;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_s) {
-			down.downs += 1;
-			down.pressed = true;
-			return true;
-		}
-	} else if (evt.type == SDL_KEYUP) {
-		if (evt.key.keysym.sym == SDLK_a) {
-			left.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_d) {
-			right.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_w) {
-			up.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_s) {
-			down.pressed = false;
-			return true;
-		}
-	} else if (evt.type == SDL_MOUSEBUTTONDOWN) {
-		if (SDL_GetRelativeMouseMode() == SDL_FALSE) {
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			return true;
-		}
-	} else if (evt.type == SDL_MOUSEMOTION) {
-		if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
-			glm::vec2 motion = glm::vec2(
-				evt.motion.xrel / float(window_size.y),
-				-evt.motion.yrel / float(window_size.y)
-			);
-			camera->transform->rotation = glm::normalize(
-				camera->transform->rotation
-				* glm::angleAxis(-motion.x * camera->fovy, glm::vec3(0.0f, 1.0f, 0.0f))
-				* glm::angleAxis(motion.y * camera->fovy, glm::vec3(1.0f, 0.0f, 0.0f))
-			);
-			return true;
-		}
-	}
+    if (evt.type == SDL_KEYDOWN) {
+        if (evt.key.keysym.sym == SDLK_UP) {
+            up_pressed = true;
+            return true;
+        } else if (evt.key.keysym.sym == SDLK_DOWN) {
+            down_pressed = true;
+            return true;
+        } else if (evt.key.keysym.sym == SDLK_RETURN) {
+            enter_pressed = true;
+            return true;
+        }
+    }
 
 	return false;
 }
 
 void PlayMode::update(float elapsed) {
+    uint32_t state_id = story_line[current_event];
+    StateType state_type = id_to_state_type[state_id];
 
-	//slowly rotates through [0,1):
-	wobble += elapsed / 10.0f;
-	wobble -= std::floor(wobble);
+    // reached end of game
+    if (current_event >= 11 && enter_pressed) {
+        current_event = 0;
+        academics = 100.f;
+        social = 100.f;
+        health = 100.f;
+    } else if (academics <= 0 && enter_pressed) {
+        current_event = 12;
+    } else if (social <= 0 && enter_pressed) {
+        current_event = 13;
+    } else if (health <= 0 && enter_pressed) {
+        current_event = 14;
+    } else if (state_type == DIALOGUE && enter_pressed) {
+        current_event++;
+    } else if (state_type == CHOICE) {
+        if (up_pressed) {
+            choice1_selected = true;
+        } else if (down_pressed) {
+            choice1_selected = false;
+        }
 
-	hip->rotation = hip_base_rotation * glm::angleAxis(
-		glm::radians(5.0f * std::sin(wobble * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 1.0f, 0.0f)
-	);
-	upper_leg->rotation = upper_leg_base_rotation * glm::angleAxis(
-		glm::radians(7.0f * std::sin(wobble * 2.0f * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
-	lower_leg->rotation = lower_leg_base_rotation * glm::angleAxis(
-		glm::radians(10.0f * std::sin(wobble * 3.0f * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
+        // go to effect
+        if (enter_pressed) {
+            Choice choice = choice_map[state_id];
+            ChoiceSelect choice_selected;
+            if (choice1_selected) {
+                choice_selected = choice.choice1;
+            } else {
+                choice_selected = choice.choice2;
+            }
 
-	//move sound to follow leg tip position:
-	leg_tip_loop->set_position(get_leg_tip_position(), 1.0f / 60.0f);
+            float p = static_cast <float> (rand()) /(static_cast <float> (RAND_MAX));
+            Effect effect;
+            if (p < choice_selected.prob) {
+                effect = effect_map[choice_selected.effect1_id];
+            } else {
+                effect = effect_map[choice_selected.effect2_id];
+            }
 
-	//move camera:
-	{
+            academics += effect.academics;
+            social += effect.social;
+            health += effect.health;
+            current_event++;
+            story_line[current_event] = effect.id;
+        }
+    } else if (state_type == EFFECT && enter_pressed) {
+        current_event++;
+        choice1_selected = true;
+    }
 
-		//combine inputs into a move:
-		constexpr float PlayerSpeed = 30.0f;
-		glm::vec2 move = glm::vec2(0.0f);
-		if (left.pressed && !right.pressed) move.x =-1.0f;
-		if (!left.pressed && right.pressed) move.x = 1.0f;
-		if (down.pressed && !up.pressed) move.y =-1.0f;
-		if (!down.pressed && up.pressed) move.y = 1.0f;
+    up_pressed = false;
+    down_pressed = false;
+    enter_pressed = false;
+}
 
-		//make it so that moving diagonally doesn't go faster:
-		if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * elapsed;
+// SOURCE for most of render_line function: https://learnopengl.com/In-Practice/Text-Rendering
+float PlayMode::render_line(std::string text, float &start_x, float &start_y, float scale, glm::vec3 color, glm::uvec2 const &drawable_size) {
 
-		glm::mat4x3 frame = camera->transform->make_local_to_parent();
-		glm::vec3 right = frame[0];
-		//glm::vec3 up = frame[1];
-		glm::vec3 forward = -frame[2];
+    glDisable(GL_DEPTH_TEST);
+    glUseProgram(color_texture_program->program);
+    glm::mat4 projection = glm::ortho(0.0f, (float)drawable_size.x, 0.0f, (float)drawable_size.y);
+    glUniformMatrix4fv(color_texture_program->OBJECT_TO_CLIP_mat4, 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3f(color_texture_program->Color_vec3, color.x, color.y, color.z);
 
-		camera->transform->position += move.x * right + move.y * forward;
-	}
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(VAO);
 
-	{ //update listener to camera position:
-		glm::mat4x3 frame = camera->transform->make_local_to_parent();
-		glm::vec3 right = frame[0];
-		glm::vec3 at = frame[3];
-		Sound::listener.set_position_right(at, right, 1.0f / 60.0f);
-	}
+    // SOURCE for setting up harfbuzz: https://github.com/harfbuzz/harfbuzz-tutorial/blob/master/hello-harfbuzz-freetype.c
+    /* Create hb-ft font. */
+    hb_font_t *hb_font;
+    hb_font = hb_ft_font_create (face, NULL);
 
-	//reset button press counters:
-	left.downs = 0;
-	right.downs = 0;
-	up.downs = 0;
-	down.downs = 0;
+    /* Create hb-buffer and populate. */
+    hb_buffer_t *hb_buffer;
+    hb_buffer = hb_buffer_create ();
+    hb_buffer_add_utf8 (hb_buffer, text.c_str(), -1, 0, -1);
+    hb_buffer_guess_segment_properties (hb_buffer);
+
+    /* Shape it! */
+    hb_shape (hb_font, hb_buffer, NULL, 0);
+
+    /* Get glyph information and positions out of the buffer. */
+    unsigned int len = hb_buffer_get_length (hb_buffer);
+    hb_glyph_info_t *info = hb_buffer_get_glyph_infos (hb_buffer, NULL);
+    hb_glyph_position_t *pos = hb_buffer_get_glyph_positions (hb_buffer, NULL);
+
+    float x = start_x;
+    float y = start_y;
+    float biggest_char_size = 0;
+
+    float enter = 0;
+
+    // create new charcters for the info[i].codepoints that are not already loaded
+    for (unsigned int i = 0; i < len; ++i) {
+        auto codepoint = info[i].codepoint;
+
+        auto it = Characters.find(codepoint);
+        Character ch;
+        if (it == Characters.end()) {
+             // set size to load glyphs as
+            FT_Set_Pixel_Sizes(face, 0, 48);
+
+            // disable byte-alignment restriction
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+            if (FT_Load_Glyph(face, codepoint, FT_LOAD_RENDER)) {
+                std::cout << "ERROR::FREETYTPE: Failed to load Glyph (FT_Load_Glyph)" << std::endl;
+                abort();
+            }
+
+            // generate texture
+            unsigned int texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RED,
+                face->glyph->bitmap.width,
+                face->glyph->bitmap.rows,
+                0,
+                GL_RED,
+                GL_UNSIGNED_BYTE,
+                face->glyph->bitmap.buffer
+            );
+            // set texture options
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            // now store character for later use
+            ch = {
+                texture,
+                glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+                glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+                static_cast<unsigned int>(face->glyph->advance.x)
+            };
+            Characters.insert(std::pair<hb_codepoint_t, Character>(codepoint, ch));
+        } else {
+            ch = it->second;
+        }
+
+        biggest_char_size = fmax(biggest_char_size, ch.Size.y);
+
+        float xpos = x + ch.Bearing.x * scale;
+        float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+
+        float w = ch.Size.x * scale;
+        float h = ch.Size.y * scale;
+
+        // update VBO for each character
+        float vertices[6][4] = {
+            { xpos,     ypos + h,   0.0f, 0.0f },            
+            { xpos,     ypos,       0.0f, 1.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+
+            { xpos,     ypos + h,   0.0f, 0.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+            { xpos + w, ypos + h,   1.0f, 0.0f }           
+        };
+        // render glyph texture over quad
+        glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+        // update content of VBO memory
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // render quad
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+        x += (pos[i].x_advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+        y += (pos[i].y_advance >> 6) * scale;
+
+        if (x >= ((float)drawable_size.x - 50.0f)) {
+            x = start_x;
+            y -= (biggest_char_size * 2 * scale);
+        }
+        start_y = y;
+    }
+
+    enter = biggest_char_size * 2 * scale;
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
+    return enter;
+}
+
+void PlayMode::render_text(std::string text, float start_x, float start_y, float scale, glm::vec3 color, glm::uvec2 const &drawable_size) {
+    std::string line;
+    float x = start_x;
+    float y = start_y;
+    for (auto &ch : text) {
+        if (ch == '\n') {
+            if (line.size() > 0) {
+                float enter = render_line(line, x, y, scale, color, drawable_size);
+                y -= enter;
+            }
+            line = "";
+        } else {
+            line.push_back(ch);
+        }
+    }
+    if (line.size() > 0) {
+        render_line(line, x, y, scale, color, drawable_size);
+    }
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
-	//update camera aspect ratio for drawable:
-	camera->aspect = float(drawable_size.x) / float(drawable_size.y);
-
-	//set up light type and position for lit_color_texture_program:
-	// TODO: consider using the Light(s) in the scene to do this
-	glUseProgram(lit_color_texture_program->program);
-	glUniform1i(lit_color_texture_program->LIGHT_TYPE_int, 1);
-	glUniform3fv(lit_color_texture_program->LIGHT_DIRECTION_vec3, 1, glm::value_ptr(glm::vec3(0.0f, 0.0f,-1.0f)));
-	glUniform3fv(lit_color_texture_program->LIGHT_ENERGY_vec3, 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 0.95f)));
-	glUseProgram(0);
-
-	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 	glClearDepth(1.0f); //1.0 is actually the default value to clear the depth buffer to, but FYI you can change it.
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS); //this is the default depth comparison function, but FYI you can change it.
+    uint32_t state_id = story_line[current_event];
+    StateType state_type = id_to_state_type[state_id];
 
-	scene.draw(*camera);
+    float scale = drawable_size.x/2560.f;
+    scale = fmin(scale, drawable_size.y/1440.f);
 
-	{ //use DrawLines to overlay some text:
-		glDisable(GL_DEPTH_TEST);
-		float aspect = float(drawable_size.x) / float(drawable_size.y);
-		DrawLines lines(glm::mat4(
-			1.0f / aspect, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
-		));
+    switch (state_type) {
+        case DIALOGUE: {
+            Dialogue dialogue = dialogue_map[state_id];
+            // render dialogue
+            render_text(dialogue.text, align_left_x, drawable_size.y - dialogue_y_minus * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+            break;
+        }
+        case CHOICE: {
+            Choice choice = choice_map[state_id];
+            // render text
+            render_text(choice.text, align_left_x, drawable_size.y - dialogue_y_minus * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
 
-		constexpr float H = 0.09f;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
-			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
-			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
-			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
-	}
+            if (choice1_selected) {
+                std::string chosen_text = "[ " + choice.choice1.text + " ]";
+                render_text(chosen_text, align_left_x, drawable_size.y - dialogue_y_minus* 3 *scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+                render_text(choice.choice2.text, align_left_x, drawable_size.y - dialogue_y_minus * 4 * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+            } else {
+                std::string chosen_text = "[ " + choice.choice2.text + " ]";
+                render_text(choice.choice1.text, align_left_x, drawable_size.y - dialogue_y_minus*3 * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+                render_text(chosen_text, align_left_x, drawable_size.y - dialogue_y_minus*4 * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+            }
+
+            break;
+        }
+        case EFFECT: {
+            Effect effect = effect_map[state_id];
+            // render dialogue
+            render_text(effect.text, align_left_x, drawable_size.y - dialogue_y_minus * scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+            break;
+        }
+    }
+
+    if (academics > 100) {
+        academics = 100;
+    }
+
+    if (social > 100) {
+        social = 100;
+    }
+
+    if (health > 100) {
+        health = 100;
+    }
+
+    // render stats
+    std::string stats = "Academics: " + std::to_string(academics) + "   Social: " + std::to_string(social) + "   Health: " + std::to_string(health);
+    render_text(stats, align_left_x, drawable_size.y - dialogue_y_minus*6*scale, scale, glm::vec3(0.0f, 0.0f, 0.0f), drawable_size);
+
 	GL_ERRORS();
-}
-
-glm::vec3 PlayMode::get_leg_tip_position() {
-	//the vertex position here was read from the model in blender:
-	return lower_leg->make_local_to_world() * glm::vec4(-1.26137f, -11.861f, 0.0f, 1.0f);
 }
